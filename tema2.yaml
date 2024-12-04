@@ -1,0 +1,31 @@
+version: "3.8"
+services:
+  scd_rest_api:
+    container_name: scd_rest_api
+    build:
+      context: ./rest_api
+      dockerfile: Dockerfile
+    ports:
+      - "5000:80"
+    networks:
+      - net
+    depends_on:
+      - scd_mongodb
+  scd_mongodb:
+    image: mongo:latest
+    container_name: scd_mongodb 
+    environment:
+      - MONGO_INITDB_DATABASE=scd_tema2
+      - MONGO_INITDB_ROOT_USERNAME=root
+      - MONGO_INITDB_ROOT_PASSWORD=example
+    volumes:
+      - mongodb_data:/data/db
+      - ./init_scd_mongodb.js:/docker-entrypoint-initdb.d/init_scd_mongodb.js
+    networks:
+      - net
+
+networks:
+  net:
+
+volumes:
+  mongodb_data: {}
