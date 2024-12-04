@@ -13,14 +13,13 @@ services:
       - scd_mongodb
   scd_mongodb:
     image: mongo:latest
-    container_name: scd_mongodb 
+    container_name: scd_mongodb
     environment:
       - MONGO_INITDB_DATABASE=scd_tema2
       - MONGO_INITDB_ROOT_USERNAME=root
       - MONGO_INITDB_ROOT_PASSWORD=example
     volumes:
       - mongodb_data:/data/db
-      - ./init_scd_mongodb.js:/docker-entrypoint-initdb.d/init_scd_mongodb.js
     networks:
       - net
 

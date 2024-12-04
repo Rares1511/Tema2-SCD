@@ -10,6 +10,7 @@ db = mongo_client['scd_tema2']
 
 ############################# UTILS #############################
 
+
 class ColumnNames:
     ID = 'id'
     NUME = 'nume'
@@ -19,6 +20,8 @@ class ColumnNames:
     VALOARE = 'valoare'
     TIMESTAMP = 'timestamp'
     ID_ORAS = 'id_oras'
+    FROM = 'from'
+    UNTIL = 'until'
 
 MAX_ID = 1000000
 
@@ -227,8 +230,8 @@ def api_temperatures_post():
 def api_temperatures_get():
     lat = request.args.get(ColumnNames.LAT)
     lon = request.args.get(ColumnNames.LON)
-    from_date = request.args.get('from')
-    until_date = request.args.get('until')
+    from_date = request.args.get(ColumnNames.FROM)
+    until_date = request.args.get(ColumnNames.UNTIL)
     temperatures_filter = {}
     cities_filter = {}
     if lat is not None:
@@ -247,8 +250,8 @@ def api_temperatures_get():
 
 @app.route('/api/temperatures/cities/<int:id_oras>', methods=['GET'])
 def api_temperatures_get_city_id(id_oras : int):
-    from_date = request.args.get('from')
-    until_date = request.args.get('until')
+    from_date = request.args.get(ColumnNames.FROM)
+    until_date = request.args.get(ColumnNames.UNTIL)
     temperatures_filter = {ColumnNames.ID_ORAS: id_oras}
     if from_date is not None:
         temperatures_filter[ColumnNames.TIMESTAMP] = { '$gte': datetime.strptime(from_date, '%Y-%m-%d') }
@@ -260,8 +263,8 @@ def api_temperatures_get_city_id(id_oras : int):
 
 @app.route('/api/temperatures/countries/<int:idTara>', methods=['GET'])
 def api_temperatures_get_country_id(idTara : int):
-    from_date = request.args.get('from')
-    until_date = request.args.get('until')
+    from_date = request.args.get(ColumnNames.FROM)
+    until_date = request.args.get(ColumnNames.UNTIL)
     temperatures_filter = {}
     cities = [city[ColumnNames.ID] for city in list(db['cities'].find({ColumnNames.ID_TARA: idTara}, {'_id': 0}))]
     temperatures_filter[ColumnNames.ID_ORAS] = {'$in': cities}
@@ -299,14 +302,13 @@ def api_temperatures_delete_id(id : int):
 def init():
     if 'countries' not in db.list_collection_names():
         db.create_collection('countries', validator=country_validation)
+        db['countries'].create_index([(ColumnNames.NUME, TEXT)], unique=True)
     if 'cities' not in db.list_collection_names():
         db.create_collection('cities', validator=city_validation)
+        db['cities'].create_index([(ColumnNames.NUME, TEXT)], unique=True)
     if 'temperatures' not in db.list_collection_names():
         db.create_collection('temperatures', validator=temperature_validation)
-    
-    db['countries'].create_index([(ColumnNames.NUME, TEXT)], unique=True)
-    db['cities'].create_index([(ColumnNames.NUME, TEXT)], unique=True)
-    db['temperatures'].create_index([(ColumnNames.ID_ORAS, TEXT), (ColumnNames.TIMESTAMP, TEXT)], unique=True)
+        db['temperatures'].create_index([(ColumnNames.ID_ORAS, TEXT), (ColumnNames.TIMESTAMP, TEXT)], unique=True)
     
     countries = list(db['countries'].find({}, {'_id': 0}))
     for country in countries:
