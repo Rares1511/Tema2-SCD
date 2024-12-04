@@ -3,6 +3,13 @@ from datetime import datetime
 from flask import request, jsonify
 from pymongo import MongoClient, TEXT
 
+app = flask.Flask(__name__)
+mongo_client = MongoClient('mongodb://root:example@scd_mongodb:27017/admin')
+db = mongo_client['scd_tema2']
+
+
+############################# UTILS #############################
+
 class ColumnNames:
     ID = 'id'
     NUME = 'nume'
@@ -15,9 +22,6 @@ class ColumnNames:
 
 MAX_ID = 1000000
 
-app = flask.Flask(__name__)
-mongo_client = MongoClient('mongodb://root:example@scd_mongodb:27017/admin')
-db = mongo_client['scd_tema2']
 country_id_map = {}
 cities_id_map = {}
 temperature_id_map = {}
@@ -100,36 +104,12 @@ temperature_validation = {
     }
 }
 
+
 def get_first_unused_id(map) -> int:
     for i in range(MAX_ID):
         if i not in map:
             return i
     return -1
-
-@app.before_first_request
-def before_first_request_func():
-    if 'countries' not in db.list_collection_names():
-        db.create_collection('countries', validator=country_validation)
-    if 'cities' not in db.list_collection_names():
-        db.create_collection('cities', validator=city_validation)
-    if 'temperatures' not in db.list_collection_names():
-        db.create_collection('temperatures', validator=temperature_validation)
-    
-    db['countries'].create_index([(ColumnNames.NUME, TEXT)], unique=True)
-    db['cities'].create_index([(ColumnNames.NUME, TEXT)], unique=True)
-    db['temperatures'].create_index([(ColumnNames.ID_ORAS, TEXT), ('timstamp', TEXT)], unique=True)
-    
-    countries = list(db['countries'].find({}, {'_id': 0}))
-    for country in countries:
-        country_id_map[country[ColumnNames.ID]] = country[ColumnNames.NUME]
-        
-    cities = list(db['cities'].find({}, {'_id': 0}))
-    for city in cities:
-        cities_id_map[city[ColumnNames.ID]] = city[ColumnNames.NUME]
-        
-    temperatures = list(db['temperatures'].find({}, {'_id': 0}))
-    for temperature in temperatures:
-        temperature_id_map[temperature[ColumnNames.ID]] = temperature[ColumnNames.ID_ORAS]
 
 
 ############################# COUNTRIES #############################
@@ -316,5 +296,31 @@ def api_temperatures_delete_id(id : int):
 ############################# MAIN #############################
 
 
+def init():
+    if 'countries' not in db.list_collection_names():
+        db.create_collection('countries', validator=country_validation)
+    if 'cities' not in db.list_collection_names():
+        db.create_collection('cities', validator=city_validation)
+    if 'temperatures' not in db.list_collection_names():
+        db.create_collection('temperatures', validator=temperature_validation)
+    
+    db['countries'].create_index([(ColumnNames.NUME, TEXT)], unique=True)
+    db['cities'].create_index([(ColumnNames.NUME, TEXT)], unique=True)
+    db['temperatures'].create_index([(ColumnNames.ID_ORAS, TEXT), (ColumnNames.TIMESTAMP, TEXT)], unique=True)
+    
+    countries = list(db['countries'].find({}, {'_id': 0}))
+    for country in countries:
+        country_id_map[country[ColumnNames.ID]] = country[ColumnNames.NUME]
+        
+    cities = list(db['cities'].find({}, {'_id': 0}))
+    for city in cities:
+        cities_id_map[city[ColumnNames.ID]] = city[ColumnNames.NUME]
+        
+    temperatures = list(db['temperatures'].find({}, {'_id': 0}))
+    for temperature in temperatures:
+        temperature_id_map[temperature[ColumnNames.ID]] = temperature[ColumnNames.ID_ORAS]
+
 if __name__ == '__main__':
+    init()
+    
     app.run('0.0.0.0', debug=True)
