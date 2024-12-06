@@ -25,9 +25,9 @@ class ColumnNames:
 
 MAX_ID = 1000000
 
-country_id_map = {}
-cities_id_map = {}
-temperature_id_map = {}
+used_country_ids = set()
+used_city_ids = set()
+used_temperature_ids = set()
 
 country_validation = {
     "$jsonSchema": {
@@ -122,9 +122,9 @@ def get_first_unused_id(map) -> int:
 def api_countries_post():
     request_data = request.get_json()
     try:
-        request_data[ColumnNames.ID] = get_first_unused_id(country_id_map)
+        request_data[ColumnNames.ID] = get_first_unused_id(used_country_ids)
         db['countries'].insert_one(request_data)
-        country_id_map[request_data[ColumnNames.ID]] = request_data[ColumnNames.NUME]
+        used_country_ids.add(request_data[ColumnNames.ID])
     except:
         return 'Conflict', 409
     return jsonify({ColumnNames.ID: request_data[ColumnNames.ID]}), 201
@@ -148,7 +148,7 @@ def api_countries_put(id : int):
 def api_countries_delete(id : int):
     try:
         db['countries'].delete_one({ColumnNames.ID: id})
-        country_id_map.pop(id)
+        used_country_ids.remove(id)
     except:
         return 'Not found', 404
     return 'Success', 200
@@ -161,11 +161,11 @@ def api_countries_delete(id : int):
 def api_cities_post():
     request_data = request.get_json()
     try:
-        request_data[ColumnNames.ID] = get_first_unused_id(cities_id_map)
+        request_data[ColumnNames.ID] = get_first_unused_id(used_city_ids)
         if db['countries'].find_one({ColumnNames.ID: request_data[ColumnNames.ID_TARA]}) is None:
             return 'Country not found', 404
         db['cities'].insert_one(request_data)
-        cities_id_map[request_data[ColumnNames.ID]] = request_data[ColumnNames.NUME]
+        used_city_ids.add(request_data[ColumnNames.ID])
     except:
         return 'Conflict', 409
     return 'Success', 201
@@ -203,7 +203,7 @@ def api_cities_put_id(id : int):
 def api_cities_delete_id(id : int):
     try:
         db['cities'].delete_one({ColumnNames.ID: id})
-        cities_id_map.pop(id)
+        used_city_ids.remove(id)
     except:
         return 'Not found', 404
     return 'Success', 200
@@ -218,10 +218,10 @@ def api_temperatures_post():
     try:
         if db['cities'].find_one({ColumnNames.ID: request_data[ColumnNames.ID_ORAS]}) is None:
             return 'City not found', 404
-        request_data[ColumnNames.ID] = get_first_unused_id(temperature_id_map)
+        request_data[ColumnNames.ID] = get_first_unused_id(used_temperature_ids)
         request_data[ColumnNames.TIMESTAMP] = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
         db['temperatures'].insert_one(request_data)
-        temperature_id_map[request_data[ColumnNames.ID]] = request_data[ColumnNames.ID_ORAS]
+        used_temperature_ids.add(request_data[ColumnNames.ID])
     except:
         return 'Conflict', 409
     return 'Success', 201
@@ -290,7 +290,7 @@ def api_temperatures_put_id(id : int):
 def api_temperatures_delete_id(id : int):
     try:
         db['temperatures'].delete_one({ColumnNames.ID: id})
-        temperature_id_map.pop(id)
+        used_temperature_ids.remove(id)
     except:
         return 'Not found', 404
     return 'Success', 200
@@ -312,17 +312,17 @@ def init():
     
     countries = list(db['countries'].find({}, {'_id': 0}))
     for country in countries:
-        country_id_map[country[ColumnNames.ID]] = country[ColumnNames.NUME]
+        used_country_ids.add(country[ColumnNames.ID])
         
     cities = list(db['cities'].find({}, {'_id': 0}))
     for city in cities:
-        cities_id_map[city[ColumnNames.ID]] = city[ColumnNames.NUME]
+        used_city_ids.add(city[ColumnNames.ID])
         
     temperatures = list(db['temperatures'].find({}, {'_id': 0}))
     for temperature in temperatures:
-        temperature_id_map[temperature[ColumnNames.ID]] = temperature[ColumnNames.ID_ORAS]
+        used_temperature_ids.add(temperature[ColumnNames.ID])
 
 if __name__ == '__main__':
     init()
     
-    app.run('0.0.0.0', debug=True)
+    app.run('0.0.0.0', debug=True, port=80)
