@@ -1,10 +1,11 @@
 import flask
 from datetime import datetime
 from flask import request, jsonify
-from pymongo import MongoClient, TEXT
+import pymongo as mongo
+from pymongo import errors
 
 app = flask.Flask(__name__)
-mongo_client = MongoClient('mongodb://root:example@scd_mongodb:27017/admin')
+mongo_client = mongo.MongoClient('mongodb://root:example@scd_mongodb:27017/admin')
 db = mongo_client['scd_tema2']
 
 
@@ -24,10 +25,6 @@ class ColumnNames:
     UNTIL = 'until'
 
 MAX_ID = 1000000
-
-used_country_ids = set()
-used_city_ids = set()
-used_temperature_ids = set()
 
 country_validation = {
     "$jsonSchema": {
@@ -108,9 +105,9 @@ temperature_validation = {
 }
 
 
-def get_first_unused_id(map) -> int:
+def get_first_unused_id(collection) -> int:
     for i in range(MAX_ID):
-        if i not in map:
+        if db[collection].find_one({ColumnNames.ID: i}) is None:
             return i
     return -1
 
@@ -122,11 +119,10 @@ def get_first_unused_id(map) -> int:
 def api_countries_post():
     request_data = request.get_json()
     try:
-        request_data[ColumnNames.ID] = get_first_unused_id(used_country_ids)
-        if db['countries'].find_one({ColumnNames.NUME: request_data[ColumnNames.NUME]}) is not None:
-            return 'A country with the same name already exists', 409
+        request_data[ColumnNames.ID] = get_first_unused_id('countries')
         db['countries'].insert_one(request_data)
-        used_country_ids.add(request_data[ColumnNames.ID])
+    except errors.DuplicateKeyError as e:
+        return 'A country with the same name already exists', 409
     except:
         return 'Bad Request', 400
     return jsonify({ColumnNames.ID: request_data[ColumnNames.ID]}), 201
@@ -143,14 +139,10 @@ def api_countries_put(id : int):
         # Check if the country to be updated exists
         if db['countries'].find_one({ColumnNames.ID: id}) is None:
             return 'Country not found', 404
-        # Check if the new id is already used
-        if db['countries'].find_one({ColumnNames.ID: request_data['id']}) is not None and request_data['id'] != id:
-            return 'A country with the same id already exists', 409
-        # Check if the new name is already used by another country
-        if db['countries'].find_one({ColumnNames.NUME: request_data[ColumnNames.NUME], ColumnNames.ID: {"$ne": id}}) is not None:
-            return 'A country with the same name already exists', 409
         # Try to update the country with the new data
         db['countries'].replace_one({ColumnNames.ID: id}, request_data)
+    except errors.DuplicateKeyError as e:
+        return 'A country with the same name/id already exists', 409
     except:
         return 'Bad Request', 400
     return 'Success', 200
@@ -166,7 +158,6 @@ def api_countries_delete(id : int):
         db['temperatures'].delete_many({ColumnNames.ID_ORAS: city[ColumnNames.ID]})
     db['cities'].delete_many({ColumnNames.ID_TARA: id})
     db['countries'].delete_one({ColumnNames.ID: id})
-    used_country_ids.remove(id)
     return 'Success', 200
 
 
@@ -178,19 +169,17 @@ def api_cities_post():
     request_data = request.get_json()
     try:
         # Assign an unique id to the city
-        request_data[ColumnNames.ID] = get_first_unused_id(used_city_ids)
+        request_data[ColumnNames.ID] = get_first_unused_id('cities')
         # Check if the country of the city exists
         if db['countries'].find_one({ColumnNames.ID: request_data[ColumnNames.ID_TARA]}) is None:
             return 'Country not found', 404
-        # Check if the city already exists
-        if db['cities'].find_one({ColumnNames.NUME: request_data[ColumnNames.NUME]}) is not None:
-            return 'A city with the same name already exists', 409
         # Insert the city in the database
         db['cities'].insert_one(request_data)
-        used_city_ids.add(request_data[ColumnNames.ID])
+    except errors.DuplicateKeyError as e:
+        return 'A city with the same name already exists', 409
     except:
         return 'Bad Request', 400
-    return 'Success', 201
+    return jsonify({ColumnNames.ID: request_data[ColumnNames.ID]}), 201
 
 @app.route('/api/cities', methods=['GET'])
 def api_cities_get():
@@ -215,14 +204,10 @@ def api_cities_put_id(id : int):
         # Check if the new country of the city exists
         if db['countries'].find_one({ColumnNames.ID: request_data[ColumnNames.ID_TARA]}) is None:
             return 'Country not found', 404
-        # Check if the new id is already used
-        if db['cities'].find_one({ColumnNames.ID: request_data['id']}) is not None and request_data['id'] != id:
-            return 'A city with the same id already exists', 409
-        # Check if the new name is already used by another city
-        if db['cities'].find_one({ColumnNames.NUME: request_data[ColumnNames.NUME], ColumnNames.ID: {"$ne": id}}) is not None:
-            return 'A city with the same name already exists', 409
         # Update the city with the new data
         db['cities'].replace_one({ColumnNames.ID: id}, request_data)
+    except errors.DuplicateKeyError as e:
+        return 'A city with the same name/id already exists', 409
     except:
         return 'Bad Request', 400
     return 'Success', 200
@@ -233,7 +218,6 @@ def api_cities_delete_id(id : int):
         return 'Not found', 404
     db['temperatures'].delete_many({ColumnNames.ID_ORAS: id})
     db['cities'].delete_one({ColumnNames.ID: id})
-    used_city_ids.remove(id)
     return 'Success', 200
 
 
@@ -244,17 +228,16 @@ def api_cities_delete_id(id : int):
 def api_temperatures_post():
     request_data = request.get_json()
     try:
-        request_data[ColumnNames.ID] = get_first_unused_id(used_temperature_ids)
+        request_data[ColumnNames.ID] = get_first_unused_id('temperatures')
         request_data[ColumnNames.TIMESTAMP] = datetime.now()
         if db['cities'].find_one({ColumnNames.ID: request_data[ColumnNames.ID_ORAS]}) is None:
             return 'City not found', 404
-        if db['temperatures'].find_one({ColumnNames.ID_ORAS: request_data[ColumnNames.ID_ORAS], ColumnNames.TIMESTAMP: request_data[ColumnNames.TIMESTAMP]}) is not None:
-            return 'A temperature with the same city and timestamp already exists', 409
         db['temperatures'].insert_one(request_data)
-        used_temperature_ids.add(request_data[ColumnNames.ID])
+    except errors.DuplicateKeyError as e:
+        return 'A temperature with the same city and timestamp already exists', 409
     except:
         return 'Bad Request', 400
-    return 'Success', 201
+    return jsonify({ColumnNames.ID: request_data[ColumnNames.ID]}), 201
 
 @app.route('/api/temperatures', methods=['GET'])
 def api_temperatures_get():
@@ -275,7 +258,7 @@ def api_temperatures_get():
     if until_date is not None:
         temperatures_filter[ColumnNames.TIMESTAMP] = { '$lte': datetime.strptime(until_date, '%Y-%m-%d') }
     temperatures = [{**temperature, ColumnNames.TIMESTAMP: temperature[ColumnNames.TIMESTAMP].strftime('%Y-%m-%d')} 
-                    for temperature in list(db['temperatures'].find(temperatures_filter, {'_id': 0}))]
+                    for temperature in list(db['temperatures'].find(temperatures_filter, {'_id': 0, ColumnNames.ID_ORAS: 0}))]
     return jsonify(temperatures), 200
 
 @app.route('/api/temperatures/cities/<int:idOras>', methods=['GET'])
@@ -288,7 +271,7 @@ def api_temperatures_get_city_id(idOras : int):
     if until_date is not None:
         temperatures_filter[ColumnNames.TIMESTAMP] = { '$lte': datetime.strptime(until_date, '%Y-%m-%d') }
     temperatures = [{**temperature, ColumnNames.TIMESTAMP: temperature[ColumnNames.TIMESTAMP].strftime('%Y-%m-%d')} 
-                    for temperature in list(db['temperatures'].find(temperatures_filter, {'_id': 0}))]
+                    for temperature in list(db['temperatures'].find(temperatures_filter, {'_id': 0, ColumnNames.ID_ORAS: 0}))]
     return jsonify(temperatures), 200
 
 @app.route('/api/temperatures/countries/<int:idTara>', methods=['GET'])
@@ -303,7 +286,7 @@ def api_temperatures_get_country_id(idTara : int):
     if until_date is not None:
         temperatures_filter[ColumnNames.TIMESTAMP] = { '$lte': datetime.strptime(until_date, '%Y-%m-%d') }
     temperatures = [{**temperature, ColumnNames.TIMESTAMP: temperature[ColumnNames.TIMESTAMP].strftime('%Y-%m-%d')} 
-                    for temperature in list(db['temperatures'].find(temperatures_filter, {'_id': 0}))]
+                    for temperature in list(db['temperatures'].find(temperatures_filter, {'_id': 0, ColumnNames.ID_ORAS: 0}))]
     return jsonify(temperatures), 200
 
 @app.route('/api/temperatures/<int:id>', methods=['PUT'])
@@ -317,13 +300,9 @@ def api_temperatures_put_id(id : int):
         # Check if the new city of the temperature exists
         if db['cities'].find_one({ColumnNames.ID: request_data[ColumnNames.ID_ORAS]}) is None:
             return 'City not found', 404
-        # Check if the new id is already used
-        if db['temperatures'].find_one({ColumnNames.ID: request_data[ColumnNames.ID]}) is not None and request_data[ColumnNames.ID] != id:
-            return 'A temperature with the same id already exists', 409
-        # Check if the new temperature's city and timestamp already exists
-        if db['temperatures'].find_one({ColumnNames.ID_ORAS: request_data[ColumnNames.ID_ORAS], ColumnNames.TIMESTAMP: request_data[ColumnNames.TIMESTAMP]}) is not None:
-            return 'A temperature with the same city and temperature already exists', 409
         db['temperatures'].replace_one({ColumnNames.ID: id}, request_data)
+    except errors.DuplicateKeyError as e:
+        return 'A temperature with the same (city and timestamp)/id already exists', 409
     except:
         return 'Bad Request', 400
     return 'Success', 200
@@ -333,7 +312,6 @@ def api_temperatures_delete_id(id : int):
     if db['temperatures'].find_one({ColumnNames.ID: id}) is None:
         return 'Not found', 404
     db['temperatures'].delete_one({ColumnNames.ID: id})
-    used_temperature_ids.remove(id)
     return 'Success', 200
 
 
@@ -343,25 +321,16 @@ def api_temperatures_delete_id(id : int):
 def init():
     if 'countries' not in db.list_collection_names():
         db.create_collection('countries', validator=country_validation)
-        db['countries'].create_index([(ColumnNames.NUME, TEXT)], unique=True)
+        db['countries'].create_index([(ColumnNames.NUME, mongo.TEXT)], unique=True)
+        db['countries'].create_index([(ColumnNames.ID, mongo.ASCENDING)], unique=True)
     if 'cities' not in db.list_collection_names():
         db.create_collection('cities', validator=city_validation)
-        db['cities'].create_index([(ColumnNames.NUME, TEXT)], unique=True)
+        db['cities'].create_index([(ColumnNames.NUME, mongo.TEXT)], unique=True)
+        db['cities'].create_index([(ColumnNames.ID, mongo.ASCENDING)], unique=True)
     if 'temperatures' not in db.list_collection_names():
         db.create_collection('temperatures', validator=temperature_validation)
-        db['temperatures'].create_index([(ColumnNames.ID_ORAS, TEXT), (ColumnNames.TIMESTAMP, TEXT)], unique=True)
-    
-    countries = list(db['countries'].find({}, {'_id': 0}))
-    for country in countries:
-        used_country_ids.add(country[ColumnNames.ID])
-        
-    cities = list(db['cities'].find({}, {'_id': 0}))
-    for city in cities:
-        used_city_ids.add(city[ColumnNames.ID])
-        
-    temperatures = list(db['temperatures'].find({}, {'_id': 0}))
-    for temperature in temperatures:
-        used_temperature_ids.add(temperature[ColumnNames.ID])
+        db['temperatures'].create_index([(ColumnNames.ID_ORAS, mongo.TEXT), (ColumnNames.TIMESTAMP, mongo.TEXT)], unique=True)
+        db['temperatures'].create_index([(ColumnNames.ID, mongo.ASCENDING)], unique=True)
 
 if __name__ == '__main__':
     init()
