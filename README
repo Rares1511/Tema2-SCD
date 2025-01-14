@@ -1,0 +1,19 @@
+Tema 2 SCD, Popa Rares Teodor, 342C3
+
+Compose:
+
+- foloseste imaginile mongo si mongo-express deja existente si se foloseste de Dockerfile pentru a da build imaginii pentru server unde am folosit
+  python flask
+
+Server:
+
+- python flask alaturi de pymongo pentru a conecta serverul la baza de date
+- se trateaza fiecare path in parte si pentru codul de eroare este folosit exceptia oferita de inserarea in baza de date
+
+Baza de date:
+
+- Am folosit mongodb pentru colectiile de tari, orase si temperaturi alaturi de indexi pentru a avea unicitatea datelor cerute
+
+Utilitar baza de date:
+
+- Am folosit mongo-express

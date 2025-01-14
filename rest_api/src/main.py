@@ -31,22 +31,10 @@ country_validation = {
         "bsonType": "object",
         "required": [ColumnNames.ID, ColumnNames.NUME, ColumnNames.LAT, ColumnNames.LON],
         "properties": {
-            ColumnNames.ID: {
-                "bsonType": "int",
-                "description": "must be an integer and is required"
-            },
-            ColumnNames.NUME: {
-                "bsonType": "string",
-                "description": "must be a string and is required"
-            },
-            ColumnNames.LAT: {
-                "bsonType": ["int", "double"],
-                "description": "must be a double and is required"
-            },
-            ColumnNames.LON: {
-                "bsonType": ["int", "double"],
-                "description": "must be a double and is required"
-            }
+            ColumnNames.ID: { "bsonType": "int" },
+            ColumnNames.NUME: { "bsonType": "string" },
+            ColumnNames.LAT: { "bsonType": ["int", "double"] },
+            ColumnNames.LON: { "bsonType": ["int", "double"] }
         }
     }
 }
@@ -56,26 +44,11 @@ city_validation = {
         "bsonType": "object",
         "required": [ColumnNames.ID, ColumnNames.ID_TARA, ColumnNames.NUME, ColumnNames.LAT, ColumnNames.LON],
         "properties": {
-            ColumnNames.ID: {
-                "bsonType": "int",
-                "description": "must be an integer and is required"
-            },
-            ColumnNames.ID_TARA: {
-                "bsonType": "int", 
-                "description": "must be an integer and is required"
-            },
-            ColumnNames.NUME: {
-                "bsonType": "string",
-                "description": "must be a string and is required"
-            },
-            ColumnNames.LAT: {
-                "bsonType": ["int", "double"],
-                "description": "must be a double and is required"
-            },
-            ColumnNames.LON: {
-                "bsonType": ["int", "double"],
-                "description": "must be a double and is required"
-            }
+            ColumnNames.ID: { "bsonType": "int" },
+            ColumnNames.ID_TARA: { "bsonType": "int" },
+            ColumnNames.NUME: { "bsonType": "string" },
+            ColumnNames.LAT: { "bsonType": ["int", "double"] },
+            ColumnNames.LON: { "bsonType": ["int", "double"] }
         }
     }
 }
@@ -85,21 +58,10 @@ temperature_validation = {
         "bsonType": "object",
         "required": [ColumnNames.ID, ColumnNames.VALOARE, ColumnNames.TIMESTAMP, ColumnNames.ID_ORAS],
         "properties": {
-            ColumnNames.ID: {
-                "bsonType": "int",
-                "description": "must be an integer and is required"
-            },
-            ColumnNames.VALOARE: {
-                "bsonType": ["int", "double"],
-                "description": "must be a string and is required"
-            },
-            ColumnNames.TIMESTAMP: {
-                "bsonType": "date"
-            },
-            ColumnNames.ID_ORAS: {
-                "bsonType": "int",
-                "description": "must be an integer and is required"
-            }
+            ColumnNames.ID: { "bsonType": "int" },
+            ColumnNames.VALOARE: { "bsonType": ["int", "double"] },
+            ColumnNames.TIMESTAMP: { "bsonType": "date" },
+            ColumnNames.ID_ORAS: { "bsonType": "int" }
         }
     }
 }
@@ -254,9 +216,9 @@ def api_temperatures_get():
     cities = [city[ColumnNames.ID] for city in list(db['cities'].find(cities_filter, {'_id': 0}))]
     temperatures_filter[ColumnNames.ID_ORAS] = {'$in': cities}
     if from_date is not None:
-        temperatures_filter[ColumnNames.TIMESTAMP] = { '$gte': datetime.strptime(from_date, '%Y-%m-%d') }
+        temperatures_filter[ColumnNames.TIMESTAMP] = {'$gte': datetime.strptime(from_date, '%Y-%m-%d')}
     if until_date is not None:
-        temperatures_filter[ColumnNames.TIMESTAMP] = { '$lte': datetime.strptime(until_date, '%Y-%m-%d') }
+        temperatures_filter[ColumnNames.TIMESTAMP] = {'$lte': datetime.strptime(until_date, '%Y-%m-%d')}
     temperatures = [{**temperature, ColumnNames.TIMESTAMP: temperature[ColumnNames.TIMESTAMP].strftime('%Y-%m-%d')} 
                     for temperature in list(db['temperatures'].find(temperatures_filter, {'_id': 0, ColumnNames.ID_ORAS: 0}))]
     return jsonify(temperatures), 200
@@ -267,9 +229,9 @@ def api_temperatures_get_city_id(idOras : int):
     until_date = request.args.get(ColumnNames.UNTIL)
     temperatures_filter = {ColumnNames.ID_ORAS: idOras}
     if from_date is not None:
-        temperatures_filter[ColumnNames.TIMESTAMP] = { '$gte': datetime.strptime(from_date, '%Y-%m-%d') }
+        temperatures_filter[ColumnNames.TIMESTAMP] = {'$gte': datetime.strptime(from_date, '%Y-%m-%d')}
     if until_date is not None:
-        temperatures_filter[ColumnNames.TIMESTAMP] = { '$lte': datetime.strptime(until_date, '%Y-%m-%d') }
+        temperatures_filter[ColumnNames.TIMESTAMP] = {'$lte': datetime.strptime(until_date, '%Y-%m-%d')}
     temperatures = [{**temperature, ColumnNames.TIMESTAMP: temperature[ColumnNames.TIMESTAMP].strftime('%Y-%m-%d')} 
                     for temperature in list(db['temperatures'].find(temperatures_filter, {'_id': 0, ColumnNames.ID_ORAS: 0}))]
     return jsonify(temperatures), 200
@@ -282,9 +244,9 @@ def api_temperatures_get_country_id(idTara : int):
     cities = [city[ColumnNames.ID] for city in list(db['cities'].find({ColumnNames.ID_TARA: idTara}, {'_id': 0}))]
     temperatures_filter[ColumnNames.ID_ORAS] = {'$in': cities}
     if from_date is not None:
-        temperatures_filter[ColumnNames.TIMESTAMP] = { '$gte': datetime.strptime(from_date, '%Y-%m-%d') }
+        temperatures_filter[ColumnNames.TIMESTAMP] = {'$gte': datetime.strptime(from_date, '%Y-%m-%d')}
     if until_date is not None:
-        temperatures_filter[ColumnNames.TIMESTAMP] = { '$lte': datetime.strptime(until_date, '%Y-%m-%d') }
+        temperatures_filter[ColumnNames.TIMESTAMP] = {'$lte': datetime.strptime(until_date, '%Y-%m-%d')}
     temperatures = [{**temperature, ColumnNames.TIMESTAMP: temperature[ColumnNames.TIMESTAMP].strftime('%Y-%m-%d')} 
                     for temperature in list(db['temperatures'].find(temperatures_filter, {'_id': 0, ColumnNames.ID_ORAS: 0}))]
     return jsonify(temperatures), 200
